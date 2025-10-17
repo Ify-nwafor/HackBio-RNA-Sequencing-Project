@@ -115,3 +115,7 @@ ggplot(resDF, aes(x = log2FoldChange, y = -log10(padj), color = padj < 0.05)) +
   xlab("Log2 Fold Change") + ylab("-Log10 Adjusted P-Value") +
   ggtitle("Volcano Plot: Chronic vs Acute")
 
+```
+-----
+# Upregulated genes 
+
