@@ -115,7 +115,107 @@ ggplot(resDF, aes(x = log2FoldChange, y = -log10(padj), color = padj < 0.05)) +
   xlab("Log2 Fold Change") + ylab("-Log10 Adjusted P-Value") +
   ggtitle("Volcano Plot: Chronic vs Acute")
 
+let's look at our differentially expressed genes
+plot(x = final_res$log2FoldChange, 
+     y = -log10(final_res$padj),
+     cex = 0.25,
+     pch = 19, 
+     col = 'grey',
+     ylim = c(0,20),
+     ylab = 'Adjusted P-Value',
+     xlab = 'Log2 FC')
+
+abline(v = c(-2, 2), h = -log10(0.5), lwd = 0.5, lty = 2)
+
+#where are the upregulated genes
+upregulated <- subset(final_res, padj < 0.05 & log2FoldChange > 2)
+points(upregulated$log2FoldChange,
+       y = -log10(upregulated$padj), 
+       cex = 0.35,
+       pch = 19,
+       col = 'salmon')
+
+# downregulated genes
+downregulated <- subset(final_res, padj < 0.05 & log2FoldChange < -2)
+points(downregulated$log2FoldChange,
+       y = -log10(downregulated$padj), 
+       cex = 0.35,
+       pch = 19,
+       col = 'lightblue')
+
+mtext('A simple volcano plot')
+
+# merge the two to do a clean and less memory efficient heatmap
+degs <- rbind(countData[rownames(upregulated),], 
+              countData[rownames(downregulated),])
+pheatmap(degs, 
+         cluster_rows = F,
+         cluster_cols = F,
+         show_rownames = F,
+         scale = 'row',
+         show_colnames = T)
+
+# upregulated and downregulated genes
+rownames(upregulated)
+rownames(downregulated)
+
+# exporting the files
+write.csv(upregulated, 'upregulated.csv')
+write.csv(downregulated, 'downregulated.csv')
+write.csv(countData, 'raw_counts.csv')
+
+# Variance stabilizing transform (VST) for QC / PCA
+vst <- vst(dds, blind = TRUE)
+library(ggplot2)
+
+# PCA plot (first two PCs)
+pcaData <- plotPCA(vst, intgroup = "Infection", returnData = TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData, aes(PC1, PC2, color = Infection, label = name)) +
+  geom_point(size = 3) +
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+  ggtitle("PCA of samples (VST)") +
+  theme_minimal()
+
+# Sample distance heatmap
+sampleDists <- dist(t(assay(vst)))
+sampleDistMat <- as.matrix(sampleDists)
+rownames(sampleDistMat) <- colnames(vst)
+colnames(sampleDistMat) <- colnames(vst)
+pheatmap(sampleDistMat, clustering_distance_rows = sampleDists,
+         clustering_distance_cols = sampleDists, main = "Sample distances (VST)")
+
+# Get results for the primary contrast (DESeq2 default uses the last level of factor as numerator)
+# If you want a specific contrast, use results(dds, contrast = c("Infection","level1","level2"))
+res <- results(dds)       # default comparison
+summary(res)
+
+# Basic MA plot and Volcano-like plot
+plotMA(resLFC, ylim = c(-5, 5), main = "MA plot (LFC-shrunk)")
+# Volcano (simple)
+resDF <- as.data.frame(resLFC)
+resDF$gene <- rownames(resDF)
+resDF$padj[is.na(resDF$padj)] <- 1
+ggplot(resDF, aes(x = log2FoldChange, y = -log10(padj))) +
+  geom_point(alpha = 0.4) +
+  theme_minimal() +
+  xlab("log2 fold change (shrunken)") + ylab("-log10 adjusted p-value") +
+  ggtitle("Volcano (shrunken LFC)")
+
+# Export results to CSV
+write.csv(as.data.frame(resLFC), file = "deseq2_results_lfc_shrunk.csv", row.names = TRUE)
+write.csv(as.data.frame(res), file = "deseq2_results_raw.csv", row.names = TRUE)
+cat("Wrote: deseq2_results_lfc_shrunk.csv and deseq2_results_raw.csv\n")
+
 ```
 -----
-# Upregulated genes 
 
+## 🧠 Functional Enrichment Analysis (using ShinyGO)
+
+Functional enrichment analysis of differentially expressed genes (DEGs) was conducted using ShinyGO v0.80 with _Staphylococcus aureus_ subsp. aureus NCTC 8325 as the reference genome. Out of 21 DEGs, 13 (62%) were successfully mapped to annotated S. aureus STRING database entries. Enrichment analysis revealed several significantly overrepresented pathways (FDR < 0.05), primarily associated with lipid metabolism and fatty acid degradation.
+
+Terms such as lipid oxidation, fatty acid β-oxidation, lipid catabolic process, and AMP-binding and ABC transporter-like proteins were enriched (FDR = 7.0 × 10⁻³ to 1.7 × 10⁻²). These processes indicate metabolic reprogramming of _S. aureus_ during infection, likely reflecting enhanced utilization of host fatty acids and energy conservation strategies under stress conditions. Such metabolic adaptations are consistent with the bacterial transition to a chronic, biofilm-associated phenotype, which supports persistence and antibiotic tolerance in periprosthetic joint infections.
+
+## 🧾 Conclusion
+This study provides transcriptomic insight into the adaptive strategies employed by _Staphylococcus aureus_ during acute and chronic phases of periprosthetic joint infection. Differential expression and enrichment analyses revealed a strong association between chronic infection and genes involved in lipid oxidation and fatty acid catabolism. These findings highlight a metabolic transition that favors energy conservation, stress tolerance, and persistence within the host. Although only a subset of genes were functionally annotated, the enrichment of lipid metabolic pathways highlights the role of metabolic reprogramming in promoting chronic infection phenotypes. These results contribute to our understanding of _S. aureus_ pathogenesis and may inform future therapeutic approaches targeting metabolic pathways essential for bacterial persistence.
