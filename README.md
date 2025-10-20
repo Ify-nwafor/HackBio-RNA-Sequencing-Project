@@ -59,7 +59,7 @@ Data were obtained from **BioProject [PRJNA867318](https://www.ncbi.nlm.nih.gov/
 ### 1. Quality Control and Alignment
 Performed using:
 - **FastQC** → read quality
-- **Trimmomatic** → adapter/low-quality trimming
+- **FastP** → adapter/low-quality trimming
 - **STAR** → alignment to *S. aureus* reference genome
 - **featureCounts** → generation of raw count matrix
 
